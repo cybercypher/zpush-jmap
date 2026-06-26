@@ -460,6 +460,16 @@ class BackendStalwart extends BackendDiff {
             $this->_protocolversion = "N/A";
         }
 
+        // Autodiscover's login() passes $username straight from
+        // SimpleXMLElement ($incomingXml->Request->EMailAddress) — PHP
+        // auto-stringifies that in concat/sprintf contexts (which is
+        // why ZLog renders it correctly), but the Rust FFI's typed
+        // String parameter on jmap_connect rejects it with
+        // "Invalid value given for argument `username`". Cast to
+        // string here so the backend is robust to either caller shape.
+        $username = (string) $username;
+        $password = (string) $password;
+
         ZLog::Write(LOGLEVEL_DEBUG, 'Stalwart->Logon(): START { user: ' . $username . ', backend_version: ' . $this->GetBackendVersion() . ' }');
 
         $this->mainUser = $username;

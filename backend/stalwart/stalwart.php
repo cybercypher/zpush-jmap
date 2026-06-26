@@ -1958,16 +1958,39 @@ class BackendStalwart extends BackendDiff {
             if ($bodyData != '') $data['description'] = $bodyData;
         }
 
-        // Participants (organizer + attendees)
+        // Participants (organizer + attendees).
+        //
+        // iOS and several other EAS clients don't populate
+        // organizername/organizeremail on the SyncAppointment for events
+        // the user is creating — they assume the server knows who's
+        // signed in. Z-Push surfaces that gap as a WARN ("Parameter
+        // 'organizername' and 'organizeremail' should be set for a
+        // meeting request") and then continues. We hit Stalwart's
+        // JMAP CalendarEvent/set without an organizer in the
+        // participants map, which means there's no `roles.owner`
+        // participant, which means Stalwart's scheduling layer has no
+        // basis to fire iTIP and the attendees never receive an
+        // invitation email.
+        //
+        // Fill in the authenticated user as organizer when EAS
+        // doesn't. Safe because $this->_user is the same identity
+        // Stalwart used to authenticate the JMAP session, so the
+        // ownership claim matches what the backend will accept.
+        $organizerEmail = (isset($appt->organizeremail) && $appt->organizeremail != '')
+            ? $appt->organizeremail
+            : $this->_user;
+        $organizerName = (isset($appt->organizername) && $appt->organizername != '')
+            ? $appt->organizername
+            : null;
+
         $participants = array();
-        if (isset($appt->organizeremail) && $appt->organizeremail != '') {
-            $org = array(
-                'roles' => array('owner' => true, 'attendee' => true, 'chair' => true),
-                'sendTo' => array('imip' => 'mailto:' . $appt->organizeremail),
-            );
-            if (isset($appt->organizername)) $org['name'] = $appt->organizername;
-            $participants['p0'] = $org;
-        }
+        $org = array(
+            'roles' => array('owner' => true, 'attendee' => true, 'chair' => true),
+            'sendTo' => array('imip' => 'mailto:' . $organizerEmail),
+        );
+        if ($organizerName !== null) $org['name'] = $organizerName;
+        $participants['p0'] = $org;
+
         if (isset($appt->attendees) && is_array($appt->attendees)) {
             $ai = 1;
             foreach ($appt->attendees as $att) {

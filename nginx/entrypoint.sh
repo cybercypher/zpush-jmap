@@ -237,6 +237,22 @@ sed -i -E "s#^(\s*define\('BACKEND_PROVIDER',\s*)'[^']*'#\1'BackendStalwart'#" "
 # then rejects with a 401.
 sed -i -E "s#^(\s*define\('USE_FULLEMAIL_FOR_LOGIN',\s*)(true|false)#\1true#" "$AUTODISCOVER_CONFIG_FILE"
 
+# When clients hit autodiscover at a separate hostname (e.g.
+# autodiscover.example.com), Z-Push's createResponse() falls back to
+# $_SERVER['HTTP_HOST'] for the EAS server URL — so the autodiscover
+# response tells the device "use https://autodiscover.example.com/
+# Microsoft-Server-ActiveSync" which is cosmetically wrong (devices
+# show autodiscover.* as their server) even though it works at the TLS
+# layer if the same cert covers both names. Set ZPUSH_HOST so the
+# autodiscover response always carries the canonical EAS hostname.
+if [ -n "${ZPUSH_HOST:-}" ]; then
+    if grep -qE "^\s*//\s*define\('ZPUSH_HOST'" "$AUTODISCOVER_CONFIG_FILE"; then
+        sed -i -E "s#^\s*//\s*define\('ZPUSH_HOST',\s*'[^']*'\);#    define('ZPUSH_HOST', '${ZPUSH_HOST}');#" "$AUTODISCOVER_CONFIG_FILE"
+    elif grep -qE "^\s*define\('ZPUSH_HOST'" "$AUTODISCOVER_CONFIG_FILE"; then
+        sed -i -E "s#^(\s*define\('ZPUSH_HOST',\s*)'[^']*'#\1'${ZPUSH_HOST}'#" "$AUTODISCOVER_CONFIG_FILE"
+    fi
+fi
+
 # --- Configure Stalwart Backend from Environment Variables ---
 STALWART_CONFIG="/var/www/zpush/backend/stalwart/config.php"
 if [ -f "$STALWART_CONFIG" ]; then

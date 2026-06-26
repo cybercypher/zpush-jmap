@@ -1882,7 +1882,25 @@ class BackendStalwart extends BackendDiff {
         $data = array();
 
         if (isset($appt->subject)) $data['title'] = $appt->subject;
-        if (isset($appt->location)) $data['location'] = $appt->location;
+        // JMAP CalendarEvent (RFC 8984) takes `locations`: a map keyed
+        // by an arbitrary id, with each value being a Location object
+        // (`@type: Location`, `name`, etc.). Stalwart rejects the
+        // singular `location` shape we used to send with
+        // {"description":"Invalid property.","properties":["location"],
+        // "type":"invalidProperties"}. Round-trip is fine even after
+        // this: the Rust crate's extract_calendar_location() already
+        // flattens the read-side locations map back into a single
+        // string at the FFI boundary, so device-side EAS only ever
+        // sees `$appt->location` regardless of which shape Stalwart
+        // stores.
+        if (isset($appt->location) && $appt->location !== '') {
+            $data['locations'] = array(
+                '1' => array(
+                    '@type' => 'Location',
+                    'name'  => (string) $appt->location,
+                ),
+            );
+        }
         if (isset($appt->uid)) $data['uid'] = $appt->uid;
 
         // Start time and timezone

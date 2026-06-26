@@ -2148,6 +2148,17 @@ class BackendStalwart extends BackendDiff {
             return false;
         }
 
+        // Z-Push doesn't guarantee Setup() runs before SendMail() — the EAS
+        // request processor dispatches the SendMail command directly without
+        // a preceding FolderSync. Each PHP-FPM worker handles requests with
+        // a fresh backend instance, so $this->_folders / $this->_sentID
+        // start empty and stay empty unless we populate them here. Without
+        // this call, the "No folders available" path below always fires and
+        // every outbound message gets stuck in the device's Outbox.
+        if (empty($this->_folders) && method_exists($this, 'Setup')) {
+            $this->Setup($this->_user);
+        }
+
         // Ensure we have the sent folder ID
         if (!$this->_sentID) {
             // Try to find it from folders

@@ -56,6 +56,11 @@ RUN set -e && \
 # Copy the Stalwart JMAP backend
 # Build context is project root, so we copy from backend/stalwart
 COPY backend/stalwart /var/www/zpush/backend/stalwart
+COPY VERSION /var/www/zpush/backend/stalwart/VERSION
+
+# Fix invalid folder mappings and empty completion dates in the Z-Push framework.
+# Fail the build if an upstream upgrade no longer matches this compatibility patch.
+RUN patch --batch --fuzz=0 -p1 -d /var/www/zpush < /var/www/zpush/backend/stalwart/zpush-compat.patch
 
 # Install composer dependencies
 RUN echo "Installing main Z-Push composer dependencies..." && \
